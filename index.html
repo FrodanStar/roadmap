@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Дорожная карта</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Russo+One&family=PT+Sans:wght@400;700&family=PT+Mono&display=swap">
+<style>
+/* Вид: ночная дорога. Этапы стоят вдоль разметки, как дорожные указатели. Тема одна, тёмная, намеренно. */
+:root {
+  color-scheme: dark;
+  --night: #15191a;
+  --asphalt: #1f2525;
+  --asphalt-2: #2a3131;
+  --line: #3b4442;
+  --paper: #d8ceb2;
+  --ink: #23201a;
+  --text: #e4dfd2;
+  --muted: #a3a698;
+  --needle: #6f9a68;
+  --lamp: #e0b354;
+  --rust: #cf7f4f;
+  --sky: #86aebd;
+  --danger: #e38468;
+  --display: "Russo One", "Arial Black", sans-serif;
+  --body: "PT Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "PT Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--night); color: var(--text); font: 16px/1.45 var(--body); }
+.page {
+  max-width: 880px; margin: 0 auto;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 24px;
+}
+input, textarea, select, button { font: inherit; color: inherit; }
+button, select { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+
+.ghost {
+  width: 100%; min-width: 0; background: transparent; border: 1px solid transparent;
+  border-radius: 3px; padding: 3px 6px; resize: none; display: block;
+}
+.ghost:hover { border-color: var(--line); }
+.ghost:focus { background: var(--night); border-color: var(--lamp); outline: none; }
+.ghost::placeholder { color: var(--muted); }
+
+header { display: grid; gap: 14px; }
+#project-name { font: 30px/1.15 var(--display); padding-inline: 0; }
+.progress-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.percent { font: 38px/1 var(--display); color: var(--lamp); font-variant-numeric: tabular-nums; }
+.counts { color: var(--muted); font-family: var(--mono); font-size: 13px; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.btn {
+  background: var(--paper); color: var(--ink); border: 0; border-radius: 3px;
+  padding: 7px 12px; font-weight: 700;
+}
+.btn:hover { background: #ece3c9; }
+.btn.quiet { background: var(--asphalt-2); color: var(--text); font-weight: 400; }
+.btn.quiet:hover { background: var(--line); }
+.chip {
+  background: transparent; color: var(--muted); border: 1px solid var(--line);
+  border-radius: 3px; padding: 5px 10px; font-size: 14px;
+}
+.chip[aria-pressed="true"] { background: var(--asphalt-2); color: var(--text); border-color: var(--muted); }
+#save-state { margin-left: auto; font: 13px var(--mono); color: var(--muted); }
+#save-state.bad { color: var(--danger); }
+.notice { background: var(--asphalt); padding: 10px 12px; color: var(--lamp); font-size: 14px; }
+
+/* Дорога: прерывистая осевая линия слева, этапы стоят вдоль неё */
+#road {
+  display: grid; gap: 28px; padding-left: 34px;
+  background: repeating-linear-gradient(to bottom, var(--paper) 0 16px, transparent 16px 34px) 11px 0 / 3px 100% no-repeat;
+}
+.stage { position: relative; display: grid; gap: 8px; min-width: 0; }
+.marker {
+  position: absolute; left: -34px; top: 4px; width: 26px; height: 26px;
+  background: var(--paper); color: var(--ink); font: 13px/26px var(--mono);
+  text-align: center; border-radius: 2px;
+}
+.stage.complete .marker { background: var(--needle); }
+.stage-head { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.stage-title { flex: 1 1 220px; min-width: 0; }
+.stage-title input { font: 20px/1.25 var(--display); padding-inline: 4px; }
+.stage-meta { font: 13px var(--mono); color: var(--muted); padding-top: 6px; font-variant-numeric: tabular-nums; }
+.stage-actions, .task-actions { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
+.icon {
+  background: none; border: 0; color: var(--muted); border-radius: 3px;
+  min-width: 30px; height: 30px; padding: 0 6px;
+}
+.icon:hover { background: var(--asphalt-2); color: var(--text); }
+.icon.really { color: var(--night); background: var(--danger); }
+.bar { height: 4px; background: var(--asphalt-2); }
+.bar i { display: block; height: 100%; background: var(--needle); }
+
+.tasks { display: grid; gap: 1px; }
+.task {
+  background: var(--asphalt); padding: 8px 10px;
+  display: grid; grid-template-columns: 124px minmax(0, 1fr) auto; gap: 4px 10px; align-items: start;
+}
+.task:hover { background: #242b2b; }
+.status {
+  appearance: none; border: 0; border-radius: 2px; padding: 4px 8px;
+  background: var(--asphalt-2); font-size: 14px; width: 100%; font-weight: 700;
+}
+.status[data-s="done"] { color: var(--needle); }
+.status[data-s="doing"] { color: var(--lamp); }
+.status[data-s="check"] { color: var(--sky); }
+.status[data-s="todo"] { color: var(--muted); }
+.status option { background: var(--asphalt); color: var(--text); font-weight: 400; }
+.task-text { min-width: 0; display: grid; gap: 1px; }
+.task-title { font-weight: 700; }
+.task[data-s="done"] .task-title { color: var(--muted); font-weight: 400; }
+.task-note { font-size: 14px; color: var(--muted); }
+.move-to { background: var(--asphalt-2); border: 0; border-radius: 3px; color: var(--muted); font-size: 13px; padding: 4px; max-width: 110px; }
+.add-task { justify-self: start; background: none; border: 0; color: var(--muted); padding: 5px 0; }
+.add-task:hover { color: var(--text); }
+
+.empty { padding: 28px 0; display: grid; gap: 10px; justify-items: start; color: var(--muted); }
+.copy-box { width: 100%; height: 200px; background: var(--asphalt); border: 1px solid var(--line); padding: 10px; font: 13px var(--mono); }
+
+@media (max-width: 600px) {
+  #project-name { font-size: 24px; }
+  #road { padding-left: 28px; background-position: 8px 0; }
+  .marker { left: -28px; width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
+  .task { grid-template-columns: minmax(0, 1fr) auto; }
+  .status { grid-column: 1 / -1; width: auto; justify-self: start; }
+  .task-text { grid-column: 1 / -1; }
+  .task-actions { grid-column: 1 / -1; justify-content: flex-end; }
+  #save-state { margin-left: 0; width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <input id="project-name" class="ghost" aria-label="Название проекта" placeholder="Название проекта">
+    <div class="progress-row">
+      <span class="percent" id="percent">0%</span>
+      <span class="counts" id="counts">Загружаю карту…</span>
+    </div>
+    <div class="tools">
+      <button class="btn" id="add-stage">Добавить этап</button>
+      <button class="btn quiet" id="save-file">Сохранить в файл</button>
+      <button class="btn quiet" id="load-file">Загрузить из файла</button>
+      <input type="file" id="file-input" accept=".json,application/json" aria-label="Файл карты" hidden>
+      <button class="btn quiet" id="copy-text">Скопировать как текст</button>
+      <span id="filters" class="tools"></span>
+      <span id="save-state"></span>
+    </div>
+    <p class="notice" id="notice" hidden></p>
+    <textarea class="copy-box" id="copy-box" aria-label="Карта текстом" readonly hidden></textarea>
+  </header>
+  <main id="road"></main>
+</div>
+
+<script>
+// Начальная карта пустая. Дальше она живёт в браузере и в файлах-копиях.
+const START_PLAN = { name: "Дорожная карта", stages: [] };
+const LOCAL_KEY = "roadmap-copy";
+const SAVE_DELAY = 600;
+const STATUSES = [
+  ["todo", "Впереди"],
+  ["doing", "В работе"],
+  ["check", "Проверить"],
+  ["done", "Готово"],
+];
+
+let plan = { name: "", stages: [] };
+let filter = "all";
+let saveTimer = null;
+let armedDelete = null;
+let armedLoad = false;
+
+const $ = id => document.getElementById(id);
+const newId = () => Math.random().toString(36).slice(2, 10);
+
+function el(tag, props = {}, ...kids) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) {
+    if (key === "data") Object.assign(node.dataset, value);
+    else if (key === "aria") node.setAttribute("aria-label", value);
+    else node[key] = value;
+  }
+  node.append(...kids);
+  return node;
+}
+
+function setState(text, bad = false) {
+  $("save-state").textContent = text;
+  $("save-state").classList.toggle("bad", bad);
+}
+
+function localWrite(text) {
+  try {
+    localStorage.setItem(LOCAL_KEY, text);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function localRead() {
+  try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "null"); } catch (e) { return null; }
+}
+
+function changed() {
+  clearTimeout(saveTimer);
+  setState("Сохраняю…");
+  saveTimer = setTimeout(save, SAVE_DELAY);
+  renderSummary();
+}
+
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  const isSaved = localWrite(JSON.stringify(plan));
+  setState(isSaved ? "Сохранено в этом браузере" : "Браузер не сохранил карту. Нажмите «Сохранить в файл»", !isSaved);
+}
+
+function allTasks() {
+  return plan.stages.flatMap(stage => stage.tasks);
+}
+
+function renderSummary() {
+  const tasks = allTasks();
+  const done = tasks.filter(task => task.status === "done").length;
+  $("percent").textContent = (tasks.length ? Math.round(done / tasks.length * 100) : 0) + "%";
+  $("counts").textContent = `${done} из ${tasks.length} задач готово · этапов: ${plan.stages.length}`;
+  document.querySelectorAll(".stage").forEach(node => {
+    const stage = plan.stages.find(item => item.id === node.dataset.id);
+    if (!stage) return;
+    const count = stage.tasks.filter(task => task.status === "done").length;
+    const share = stage.tasks.length ? count / stage.tasks.length : 0;
+    node.querySelector(".stage-meta").textContent = `${count}/${stage.tasks.length}`;
+    node.querySelector(".bar i").style.width = share * 100 + "%";
+    node.classList.toggle("complete", stage.tasks.length > 0 && share === 1);
+  });
+}
+
+function renderFilters() {
+  const box = $("filters");
+  box.replaceChildren();
+  for (const [value, label] of [["all", "Все"], ...STATUSES]) {
+    const chip = el("button", { className: "chip", textContent: label });
+    chip.setAttribute("aria-pressed", String(filter === value));
+    chip.onclick = () => { filter = value; render(); };
+    box.append(chip);
+  }
+}
+
+function move(list, index, step) {
+  const target = index + step;
+  if (target < 0 || target >= list.length) return false;
+  [list[index], list[target]] = [list[target], list[index]];
+  return true;
+}
+
+function deleteButton(key, onConfirm) {
+  const isArmed = armedDelete === key;
+  const button = el("button", {
+    className: "icon" + (isArmed ? " really" : ""),
+    textContent: isArmed ? "Точно удалить?" : "✕",
+    title: "Удалить",
+    aria: "Удалить",
+  });
+  button.onclick = () => {
+    if (armedDelete === key) {
+      armedDelete = null;
+      onConfirm();
+      changed();
+    } else {
+      armedDelete = key;
+    }
+    render();
+  };
+  return button;
+}
+
+function autoGrow(area) {
+  area.style.height = "auto";
+  area.style.height = area.scrollHeight + 2 + "px";
+}
+
+function renderTask(stage, task, index) {
+  const status = el("select", { className: "status", aria: "Статус задачи", id: "status-" + task.id });
+  for (const [value, label] of STATUSES) status.append(el("option", { value, textContent: label }));
+  status.value = task.status;
+  status.dataset.s = task.status;
+
+  const row = el("article", { className: "task", data: { s: task.status } });
+  status.onchange = () => {
+    task.status = status.value;
+    status.dataset.s = task.status;
+    row.dataset.s = task.status;
+    changed();
+    if (filter !== "all") render();
+  };
+
+  const title = el("input", { className: "ghost task-title", value: task.title, placeholder: "Что сделать", aria: "Задача", id: "title-" + task.id });
+  title.oninput = () => { task.title = title.value; changed(); };
+
+  const note = el("textarea", { className: "ghost task-note", value: task.note || "", placeholder: "Заметка", rows: 1, aria: "Заметка", id: "note-" + task.id });
+  note.oninput = () => { task.note = note.value; autoGrow(note); changed(); };
+  requestAnimationFrame(() => autoGrow(note));
+
+  const moveTo = el("select", { className: "move-to", aria: "Перенести на другой этап", id: "move-" + task.id });
+  moveTo.append(el("option", { value: "", textContent: "Перенести" }));
+  plan.stages.forEach((other, number) => {
+    if (other !== stage) moveTo.append(el("option", { value: other.id, textContent: `Этап ${number + 1}` }));
+  });
+  moveTo.onchange = () => {
+    const target = plan.stages.find(item => item.id === moveTo.value);
+    if (!target) return;
+    stage.tasks.splice(stage.tasks.indexOf(task), 1);
+    target.tasks.push(task);
+    changed();
+    render();
+  };
+
+  const up = el("button", { className: "icon", textContent: "↑", title: "Выше", aria: "Выше" });
+  up.onclick = () => { if (move(stage.tasks, index, -1)) { changed(); render(); } };
+  const down = el("button", { className: "icon", textContent: "↓", title: "Ниже", aria: "Ниже" });
+  down.onclick = () => { if (move(stage.tasks, index, 1)) { changed(); render(); } };
+
+  row.append(
+    status,
+    el("div", { className: "task-text" }, title, note),
+    el("div", { className: "task-actions" }, moveTo, up, down,
+      deleteButton("task-" + task.id, () => stage.tasks.splice(stage.tasks.indexOf(task), 1)))
+  );
+  return row;
+}
+
+function renderStage(stage, index) {
+  const title = el("input", { className: "ghost", value: stage.title, placeholder: "Название этапа", aria: "Название этапа", id: "stage-" + stage.id });
+  title.oninput = () => { stage.title = title.value; changed(); };
+
+  const up = el("button", { className: "icon", textContent: "↑", title: "Этап раньше", aria: "Этап раньше" });
+  up.onclick = () => { if (move(plan.stages, index, -1)) { changed(); render(); } };
+  const down = el("button", { className: "icon", textContent: "↓", title: "Этап позже", aria: "Этап позже" });
+  down.onclick = () => { if (move(plan.stages, index, 1)) { changed(); render(); } };
+
+  const tasks = el("div", { className: "tasks" });
+  stage.tasks.forEach((task, number) => {
+    if (filter === "all" || task.status === filter) tasks.append(renderTask(stage, task, number));
+  });
+
+  const add = el("button", { className: "add-task", textContent: "+ Добавить задачу" });
+  add.onclick = () => {
+    const task = { id: newId(), title: "", note: "", status: "todo" };
+    stage.tasks.push(task);
+    filter = "all";
+    changed();
+    render();
+    $("title-" + task.id).focus();
+  };
+
+  return el("section", { className: "stage", data: { id: stage.id } },
+    el("span", { className: "marker", textContent: index + 1 }),
+    el("div", { className: "stage-head" },
+      el("div", { className: "stage-title" }, title),
+      el("span", { className: "stage-meta" }),
+      el("div", { className: "stage-actions" }, up, down,
+        deleteButton("stage-" + stage.id, () => plan.stages.splice(plan.stages.indexOf(stage), 1)))
+    ),
+    el("div", { className: "bar" }, el("i")),
+    tasks, add
+  );
+}
+
+function render() {
+  if ($("project-name") !== document.activeElement) $("project-name").value = plan.name || "";
+  renderFilters();
+  const road = $("road");
+  if (!plan.stages.length) {
+    road.replaceChildren(el("div", { className: "empty", textContent: "Дорога пока пустая. Нажмите «Добавить этап», чтобы поставить первый указатель." }));
+  } else {
+    road.replaceChildren(...plan.stages.map(renderStage));
+  }
+  renderSummary();
+}
+
+function normalize(data) {
+  const stages = Array.isArray(data?.stages) ? data.stages : [];
+  return {
+    name: String(data?.name || ""),
+    stages: stages.map(stage => ({
+      id: String(stage.id || newId()),
+      title: String(stage.title || ""),
+      tasks: (Array.isArray(stage.tasks) ? stage.tasks : []).map(task => ({
+        id: String(task.id || newId()),
+        title: String(task.title || ""),
+        note: String(task.note || ""),
+        status: STATUSES.some(([value]) => value === task.status) ? task.status : "todo",
+      })),
+    })),
+  };
+}
+
+function asText() {
+  const lines = [plan.name || "Дорожная карта", ""];
+  plan.stages.forEach((stage, index) => {
+    lines.push(`Этап ${index + 1}. ${stage.title}`);
+    for (const task of stage.tasks) {
+      const label = STATUSES.find(([value]) => value === task.status)[1];
+      lines.push(`  [${label}] ${task.title}${task.note ? " (" + task.note + ")" : ""}`);
+    }
+    lines.push("");
+  });
+  return lines.join("\n");
+}
+
+$("project-name").oninput = event => { plan.name = event.target.value; changed(); };
+
+$("add-stage").onclick = () => {
+  const stage = { id: newId(), title: "", tasks: [] };
+  plan.stages.push(stage);
+  changed();
+  render();
+  $("stage-" + stage.id).focus();
+};
+
+$("copy-text").onclick = async () => {
+  const text = asText();
+  try {
+    await navigator.clipboard.writeText(text);
+    setState("Текст скопирован");
+  } catch (error) {
+    const box = $("copy-box");
+    box.value = text;
+    box.hidden = false;
+    box.select();
+    setState("Скопируйте текст из поля ниже");
+  }
+};
+
+$("save-file").onclick = () => {
+  const link = el("a", {
+    href: URL.createObjectURL(new Blob([JSON.stringify(plan, null, 2)], { type: "application/json" })),
+    download: "дорожная-карта.json",
+  });
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  setState("Файл сохранён в папку загрузок");
+};
+
+function disarmLoad() {
+  armedLoad = false;
+  $("load-file").textContent = "Загрузить из файла";
+}
+
+$("load-file").onclick = () => {
+  if (armedLoad) {
+    disarmLoad();
+    $("file-input").click();
+    return;
+  }
+  armedLoad = true;
+  $("load-file").textContent = "Заменить текущую карту?";
+};
+
+$("file-input").onchange = async event => {
+  const file = event.target.files[0];
+  event.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data.stages)) throw new Error("В файле нет этапов");
+    plan = normalize(data);
+    save();
+    render();
+    setState("Карта загружена из файла");
+  } catch (error) {
+    setState("Это не файл дорожной карты. Выберите файл, сохранённый этой кнопкой", true);
+  }
+};
+
+plan = normalize(localRead() || START_PLAN);
+render();
+setState("Сохранено в этом браузере");
+</script>
+</body>
+</html>
