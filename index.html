@@ -161,6 +161,12 @@ header { display: grid; gap: 14px; }
 <script>
 // Начальная карта пустая. Дальше она живёт в браузере и в файлах-копиях.
 const START_PLAN = { name: "Дорожная карта", stages: [] };
+// Адрес и открытый ключ общей базы Supabase. Ключ можно держать в странице:
+// что разрешено посетителям, решают правила доступа в самой базе.
+const SUPABASE_URL = "https://dxmfsckwydoimjiodnbf.supabase.co";
+const SUPABASE_KEY = "sb_publishable_YF_DP4jrc0S87gDpSBXePg_M8oBauqf";
+const ROW_ID = "main";
+const POLL_DELAY = 5000;
 const LOCAL_KEY = "roadmap-copy";
 const SAVE_DELAY = 600;
 const STATUSES = [
@@ -175,6 +181,10 @@ let filter = "all";
 let saveTimer = null;
 let armedDelete = null;
 let armedLoad = false;
+let revision = null;
+let isShared = false;
+let isSaving = false;
+let needsAnotherSave = false;
 
 const $ = id => document.getElementById(id);
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -215,11 +225,81 @@ function changed() {
   renderSummary();
 }
 
+async function api(query, options = {}) {
+  const response = await fetch(`${SUPABASE_URL}/rest/v1/roadmaps${query}`, {
+    ...options,
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json", ...options.headers },
+  });
+  if (!response.ok) throw new Error(`База ответила ${response.status}`);
+  return response.json();
+}
+
+function isTyping() {
+  return ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
+}
+
+// Забирает общую карту. Пока человек печатает, чужие правки ждут, чтобы текст не пропал
+async function pull(isForced = false) {
+  const rows = await api(`?id=eq.${ROW_ID}&select=data,rev`);
+  if (!rows.length) throw new Error("В базе нет карты");
+  if (!isShared) {
+    isShared = true;
+    $("notice").hidden = true;
+    isForced = true;
+    setState("Сохранено для всех");
+  }
+  if (rows[0].rev === revision) return;
+  if (!isForced && (saveTimer || isSaving || isTyping())) return;
+
+  revision = rows[0].rev;
+  plan = normalize(rows[0].data);
+  localWrite(JSON.stringify(plan));
+  render();
+}
+
+async function saveShared() {
+  if (isSaving) {
+    needsAnotherSave = true;
+    return;
+  }
+
+  isSaving = true;
+  setState("Сохраняю…");
+  try {
+    // Запись пройдёт, только если карту никто не менял с момента загрузки
+    const rows = await api(`?id=eq.${ROW_ID}&rev=eq.${revision}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ data: plan, rev: revision + 1 }),
+    });
+    if (rows.length) {
+      revision = rows[0].rev;
+      setState("Сохранено для всех");
+    } else {
+      isSaving = false;
+      await pull(true);
+      setState("Кто-то изменил карту раньше вас. Показана новая версия, повторите правку", true);
+    }
+  } catch (error) {
+    setState("Нет связи с базой. Правка сохранена только в этом браузере", true);
+  }
+  isSaving = false;
+
+  if (needsAnotherSave) {
+    needsAnotherSave = false;
+    saveShared();
+  }
+}
+
 function save() {
   clearTimeout(saveTimer);
   saveTimer = null;
   const isSaved = localWrite(JSON.stringify(plan));
-  setState(isSaved ? "Сохранено в этом браузере" : "Браузер не сохранил карту. Нажмите «Сохранить в файл»", !isSaved);
+  if (isShared) {
+    saveShared();
+  } else {
+    setState(isSaved ? "Сохранено в этом браузере" : "Браузер не сохранил карту. Нажмите «Сохранить в файл»", !isSaved);
+  }
 }
 
 function allTasks() {
@@ -483,6 +563,23 @@ $("file-input").onchange = async event => {
 plan = normalize(localRead() || START_PLAN);
 render();
 setState("Сохранено в этом браузере");
+
+async function connect() {
+  try {
+    await pull();
+  } catch (error) {
+    if (isShared) return;
+    $("notice").hidden = false;
+    $("notice").textContent = "Общая база сейчас недоступна, поэтому правки сохраняются только в этом браузере. Если сайт долго не открывали, база могла уснуть.";
+  }
+}
+
+if (SUPABASE_URL) {
+  connect();
+  setInterval(() => {
+    if (!document.hidden) connect();
+  }, POLL_DELAY);
+}
 </script>
 </body>
 </html>
